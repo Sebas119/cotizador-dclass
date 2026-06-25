@@ -11,14 +11,13 @@ if 'acceso_concedido' not in st.session_state:
     st.session_state.acceso_concedido = False
 
 if not st.session_state.acceso_concedido:
-    # Lo que ve el público / la competencia
     st.title("🔒 Acceso Restringido - D/CLASS")
     st.warning("Este portal es de uso exclusivo para el personal autorizado. Ingresa la credencial para continuar.")
     
     clave = st.text_input("Contraseña:", type="password")
     
     if st.button("Entrar"):
-        if clave == "Dclass2026":  # <--- CAMBIA ESTA CONTRASEÑA POR LA QUE QUIERAS
+        if clave == "Dclass2026": 
             st.session_state.acceso_concedido = True
             st.rerun()
         else:
@@ -28,11 +27,9 @@ else:
     # --- LO QUE VE TU FAMILIA DESPUÉS DE PONER LA CLAVE ---
     st.title("Cotizador Automático - D/CLASS")
 
-    # Memoria del carrito
     if 'lista_items' not in st.session_state:
         st.session_state.lista_items = []
 
-    # Cargar datos
     @st.cache_data
     def cargar_datos():
         ruta_mod = "datos_cortinas.csv"
@@ -158,16 +155,38 @@ else:
             else:
                 st.warning("Completa el Ancho y Alto.")
 
-    # --- 5. CARRITO Y PDF ---
+    # --- 5. CARRITO INTERACTIVO Y PDF ---
     st.header("3. Resumen de Cotización")
     if len(st.session_state.lista_items) > 0:
-        df_carrito = pd.DataFrame(st.session_state.lista_items)
-        df_mostrar = df_carrito.copy()
-        df_mostrar['precio_u'] = df_mostrar['precio_u'].apply(lambda x: f"${x:.2f}")
-        df_mostrar['total'] = df_mostrar['total'].apply(lambda x: f"${x:.2f}")
-        st.table(df_mostrar[['producto', 'medida', 'unidad', 'precio_u', 'total']])
         
-        if st.button("🗑️ Vaciar Cotización"):
+        # Encabezados del carrito
+        c1, c2, c3, c4, c5 = st.columns([4, 1, 1, 1, 1])
+        c1.write("**Detalle del Producto**")
+        c2.write("**Medida**")
+        c3.write("**P. Unitario**")
+        c4.write("**P. Total**")
+        c5.write("**Acción**")
+        st.markdown("---")
+        
+        # Mostrar cada item con su botón de borrar y decimales exactos
+        for i, item in enumerate(st.session_state.lista_items):
+            col_det, col_cant, col_precio, col_tot, col_del = st.columns([4, 1, 1, 1, 1])
+            with col_det:
+                st.write(item['producto'].replace('\n', ' '))
+            with col_cant:
+                st.write(f"{item['medida']:.2f} {item['unidad']}")
+            with col_precio:
+                st.write(f"${item['precio_u']:.2f}") # Forzado a 2 decimales
+            with col_tot:
+                st.write(f"${item['total']:.2f}")   # Forzado a 2 decimales
+            with col_del:
+                # Botón individual para borrar
+                if st.button("❌ Borrar", key=f"borrar_{i}"):
+                    st.session_state.lista_items.pop(i)
+                    st.rerun()
+            st.markdown("---")
+            
+        if st.button("🗑️ Vaciar Cotización Completa"):
             st.session_state.lista_items = []
             st.rerun()
 
@@ -206,6 +225,7 @@ else:
             altura_fila = pdf.get_y() - start_y
             pdf.set_xy(10, start_y); pdf.cell(20, altura_fila, f"{item['medida']:.2f}", 'LR', 0, 'C')
             pdf.cell(10, altura_fila, item['unidad'], 'LR', 0, 'C')
+            # Forzado a 2 decimales en el PDF
             pdf.set_xy(170, start_y); pdf.cell(30, altura_fila, f"${item['total']:.2f}", 'LR', 1, 'C')
             pdf.line(10, pdf.get_y(), 200, pdf.get_y())
             subtotal += item['total']
@@ -215,6 +235,7 @@ else:
         total_contado = total_final - (total_final * 0.10)
         
         pdf.ln(5); pdf.set_font('Arial', 'B', 9)
+        # Suman, IVA y Totales forzados a 2 decimales
         pdf.cell(130, 6, '', 0, 0); pdf.cell(30, 6, 'SUMAN', 1, 0, 'R', 1); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
         pdf.cell(130, 6, '', 0, 0); pdf.cell(30, 6, '15% IVA.', 1, 0, 'R', 1); pdf.cell(30, 6, f"${iva:.2f}", 1, 1, 'R')
         pdf.cell(130, 6, '', 0, 0); pdf.cell(30, 6, 'TOTAL $.', 1, 0, 'R', 1); pdf.cell(30, 6, f"${total_final:.2f}", 1, 1, 'R')
