@@ -284,4 +284,3 @@ else:
             nueva_conf = {"telf_classica": telf1, "wa_asesores": telf2, "direccion": dir_matriz}
             guardar_json(ARCHIVO_CONFIG, nueva_conf)
             st.success("¡Datos guardados!")
-        st.info("Agrega productos en las pestañas de arriba para comenzar tu cotización.")
