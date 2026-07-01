@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import glob
 from fpdf import FPDF
 from datetime import datetime
 import urllib.parse
@@ -12,7 +13,7 @@ st.set_page_config(page_title="Cotizador D/CLASS & CLASSICA", layout="wide")
 ARCHIVO_HISTORICO = "historico.json"
 ARCHIVO_CONFIG = "config.json"
 
-# --- 2. FUNCIONES DE BASE DE DATOS (JSON) ---
+# --- 2. FUNCIONES BASE ---
 def cargar_json(archivo):
     if os.path.exists(archivo):
         try:
@@ -26,11 +27,18 @@ def guardar_json(archivo, datos):
     with open(archivo, "w", encoding="utf-8") as f:
         json.dump(datos, f, indent=4)
 
+def buscar_logo(prefijo):
+    # Busca cualquier archivo que empiece con el prefijo, sin importar la extensión
+    archivos = glob.glob(f"{prefijo}.*")
+    for arch in archivos:
+        if arch.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return arch
+    return None
+
 # Inicializar estados
 if 'acceso_concedido' not in st.session_state: st.session_state.acceso_concedido = False
 if 'lista_items' not in st.session_state: st.session_state.lista_items = []
-if 'cliente_actual' not in st.session_state: st.session_state.cliente_actual = {"nombre": "", "telefono": "", "direccion": "", "asesora": "Asesora Principal"}
-if 'cotizacion_cargada' not in st.session_state: st.session_state.cotizacion_cargada = None
+if 'cliente_actual' not in st.session_state: st.session_state.cliente_actual = {"nombre": "", "telefono": "", "direccion": "", "asesora": "Celmira Zapata"}
 
 # --- 3. LOGIN ---
 if not st.session_state.acceso_concedido:
@@ -43,10 +51,9 @@ if not st.session_state.acceso_concedido:
         else:
             st.error("Acceso denegado.")
 else:
-    # --- 4. CARGAR DATOS DE EXCEL ---
+    # --- 4. CARGAR EXCEL (CON ARMADURA) ---
     @st.cache_data
     def cargar_excel():
-        # Leer modernas con armadura
         try:
             df_mod = pd.read_csv("datos_cortinas.csv", encoding="utf-8")
         except:
@@ -56,14 +63,12 @@ else:
         df_mod['tipo de cortina'] = df_mod['tipo de cortina'].astype(str).str.title().str.strip()
         df_mod['tipo de tela'] = df_mod['tipo de tela'].fillna('Única').astype(str).str.title().str.strip()
 
-        # Leer tradicionales con armadura
         try:
             df_trad = pd.read_csv("datos_tradicionales.csv", encoding="utf-8")
         except:
             df_trad = pd.read_csv("datos_tradicionales.csv", encoding="latin-1")
             
         df_trad['Precio'] = pd.to_numeric(df_trad['Precio'].astype(str).str.replace('$', '', regex=False).str.replace(',', '.').str.strip())
-        
         return df_mod, df_trad
 
     try:
@@ -72,12 +77,11 @@ else:
         lista_visillos = df_trad[df_trad['Categoría'].astype(str).str.upper() == 'VISILLO']['Producto'].tolist()
         lista_pesadas = df_trad[df_trad['Categoría'].astype(str).str.upper() == 'CORTINA']['Producto'].tolist()
     except Exception as e:
-        st.error("Error cargando los archivos CSV. Verifica que estén en la carpeta.")
+        st.error("Error cargando los archivos CSV. Verifica que estén en la carpeta de GitHub.")
         st.stop()
 
-    # --- 5. NAVEGACIÓN LATERAL ---
+    # --- 5. NAVEGACIÓN ---
     menu = st.sidebar.radio("Navegación", ["📝 Cotizar", "📂 Histórico", "⚙️ Configurar"])
-    
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.acceso_concedido = False
         st.rerun()
@@ -94,7 +98,7 @@ else:
             st.session_state.cliente_actual["nombre"] = c1.text_input("Nombre completo", value=st.session_state.cliente_actual["nombre"])
             st.session_state.cliente_actual["telefono"] = c1.text_input("Teléfono", value=st.session_state.cliente_actual["telefono"])
             st.session_state.cliente_actual["direccion"] = c2.text_input("Dirección / Sector", value=st.session_state.cliente_actual["direccion"])
-            st.session_state.cliente_actual["asesora"] = c2.selectbox("Asesora que firma", ["Andrea Cóndor", "Celmira Zapata", "Verónica Tapia"], index=0)
+            st.session_state.cliente_actual["asesora"] = c2.selectbox("Asesora que firma", ["Andrea Cóndor", "Celmira Zapata", "Verónica Tapia"], index=1)
 
         st.markdown("---")
         st.subheader("Agregar cortina / ítem")
@@ -120,7 +124,7 @@ else:
                     
                     st.session_state.lista_items.append({
                         "ambiente": ambiente, "cantidad": cantidad, "detalle": detalle, 
-                        "precio_u": precio_u, "total": total_item, "tipo": "m2", "medida": area
+                        "precio_u": precio_u, "total": total_item
                     })
                     st.success("Añadido al carrito")
                 else:
@@ -142,7 +146,7 @@ else:
                     factor = 2.5 if "Onda Perfecta" in confec else 2.2
                     extra_onda = 3.90 if "Onda Perfecta" in confec else 0.0
                     costo_ml = 0
-                    desc = f"TRADICIONAL ({confec.split(' ')[0]}) | {ancho_trad}m x {alto_trad}m"
+                    desc = f"TRAD. ({confec.split(' ')[0]}) | {ancho_trad}m x {alto_trad}m"
                     
                     if riel_sel != "Ninguno": costo_ml += df_trad[df_trad['Producto']==riel_sel]['Precio'].values[0]
                     if visillo_sel != "Ninguno": costo_ml += (df_trad[df_trad['Producto']==visillo_sel]['Precio'].values[0] * factor)
@@ -152,7 +156,7 @@ else:
                     total_item = (costo_ml * ancho_trad) * cantidad
                     st.session_state.lista_items.append({
                         "ambiente": ambiente, "cantidad": cantidad, "detalle": desc, 
-                        "precio_u": costo_ml, "total": total_item, "tipo": "ml", "medida": ancho_trad
+                        "precio_u": costo_ml, "total": total_item
                     })
                     st.success("Añadido al carrito")
                 else:
@@ -161,7 +165,6 @@ else:
         st.markdown("---")
         st.subheader("Resumen y descuento")
         
-        # Mostrar Carrito
         subtotal = 0
         for i, item in enumerate(st.session_state.lista_items):
             c_amb, c_det, c_tot, c_acc = st.columns([2, 4, 2, 1])
@@ -184,30 +187,24 @@ else:
         st.info(f"**Suma sin IVA:** ${subtotal:.2f} | **IVA 15%:** ${iva:.2f} | **TOTAL:** ${total_con_iva:.2f}")
         st.success(f"**TOTAL DE CONTADO ({descuento_pct}% OFF): ${total_contado:.2f}**")
 
-        # ACCIONES
         ca1, ca2, ca3 = st.columns(3)
         
-        # 1. Guardar en Histórico
         if ca1.button("💾 Guardar en Histórico"):
             if len(st.session_state.lista_items) > 0 and st.session_state.cliente_actual["nombre"]:
                 historial = cargar_json(ARCHIVO_HISTORICO)
                 codigo_cot = f"PG {datetime.now().strftime('%y-%H%M%S')}"
-                nueva_cot = {
-                    "codigo": codigo_cot,
-                    "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "cliente": st.session_state.cliente_actual,
-                    "items": st.session_state.lista_items,
+                historial.append({
+                    "codigo": codigo_cot, "fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "cliente": st.session_state.cliente_actual, "items": st.session_state.lista_items,
                     "subtotal": subtotal, "iva": iva, "total": total_con_iva,
-                    "descuento": descuento_pct, "contado": total_contado,
-                    "dias": dias_entrega
-                }
-                historial.append(nueva_cot)
+                    "descuento": descuento_pct, "contado": total_contado, "dias": dias_entrega
+                })
                 guardar_json(ARCHIVO_HISTORICO, historial)
-                st.success(f"Cotización {codigo_cot} guardada con éxito!")
+                st.success("Guardado con éxito!")
             else:
-                st.error("Agrega un cliente y productos primero.")
+                st.error("Faltan datos del cliente o productos.")
 
-        # 2. WhatsApp
+        # WhatsApp
         mensaje_wa = f"*COTIZACIÓN D/CLASS & CLASSICA*\nCliente: {st.session_state.cliente_actual['nombre']}\n\n*Resumen:*\n"
         for it in st.session_state.lista_items:
             mensaje_wa += f"- {it['ambiente']} (x{it['cantidad']}): {it['detalle']} -> ${it['total']:.2f}\n"
@@ -215,125 +212,99 @@ else:
         link_wa = f"https://wa.me/?text={urllib.parse.quote(mensaje_wa)}"
         ca2.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; padding:8px; background-color:#25D366; color:white; border:none; border-radius:5px;">📱 Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
 
-        # 3. Generar PDF (Doble Logo y Diseño Profesional)
-        class PDFDoble(FPDF):
-            def header(self):
-                # Logo Izquierdo (Classica) - Intenta varias extensiones
-                for ext in ["logo_classica.jpg", "logo_classica.jpeg", "logo_classica.png"]:
-                    try:
-                        self.image(ext, 10, 8, 40)
-                        break
-                    except: pass
-                
-                # Logo Derecho (D/CLASS) - Intenta varias extensiones
-                for ext in ["logo_dclass.png", "logo_dclass.jpg", "logo_dclass.jpeg"]:
-                    try:
-                        self.image(ext, 160, 8, 40)
-                        break
-                    except: pass
-                
-                self.set_y(15)
-                self.set_font('Arial', 'B', 16)
-                self.cell(0, 10, 'COTIZACION OFICIAL', 0, 1, 'C')
-                
-                # Salto de línea vital para que los logos no tapen el texto
-                self.set_y(45) 
-                
+        # 3. Generar PDF
         if ca3.button("📄 Generar PDF"):
-            pdf = PDFDoble()
-            pdf.add_page()
-            
-            # --- Encabezado de Datos ---
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(20, 6, 'Cliente:', 0, 0)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(90, 6, st.session_state.cliente_actual['nombre'], 0, 0)
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(20, 6, 'Fecha:', 0, 0)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(0, 6, datetime.now().strftime('%d/%m/%Y'), 0, 1)
-            
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(20, 6, 'Telefono:', 0, 0)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(90, 6, st.session_state.cliente_actual['telefono'], 0, 0)
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(20, 6, 'Asesora:', 0, 0)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(0, 6, st.session_state.cliente_actual['asesora'], 0, 1)
-            
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(20, 6, 'Direccion:', 0, 0)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(0, 6, st.session_state.cliente_actual['direccion'], 0, 1)
-            
-            pdf.ln(8)
-            
-            # --- Tabla de Productos ---
-            pdf.set_fill_color(220, 220, 220)
-            pdf.set_font('Arial', 'B', 9)
-            pdf.cell(35, 8, 'AMBIENTE', 1, 0, 'C', 1)
-            pdf.cell(15, 8, 'CANT.', 1, 0, 'C', 1)
-            pdf.cell(110, 8, 'DETALLE', 1, 0, 'C', 1)
-            pdf.cell(30, 8, 'TOTAL', 1, 1, 'C', 1)
-            
-            pdf.set_font('Arial', '', 8)
-            for it in st.session_state.lista_items:
-                pdf.cell(35, 8, it['ambiente'][:18], 1, 0, 'L')
-                pdf.cell(15, 8, str(it['cantidad']), 1, 0, 'C')
-                pdf.cell(110, 8, it['detalle'], 1, 0, 'L')
-                pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'R')
+            if len(st.session_state.lista_items) == 0:
+                st.error("Agrega productos al carrito primero.")
+            else:
+                pdf = FPDF()
+                pdf.add_page()
                 
-            pdf.ln(5)
-            
-            # --- Totales ---
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(160, 6, 'SUBTOTAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
-            pdf.cell(160, 6, 'IVA (15%):', 0, 0, 'R'); pdf.cell(30, 6, f"${iva:.2f}", 1, 1, 'R')
-            pdf.cell(160, 6, 'TOTAL NORMAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${total_con_iva:.2f}", 1, 1, 'R')
-            
-            pdf.set_fill_color(255, 230, 230)
-            pdf.set_text_color(200, 0, 0)
-            pdf.cell(160, 8, f'TOTAL CONTADO ({descuento_pct}% OFF):', 0, 0, 'R')
-            pdf.cell(30, 8, f"${total_contado:.2f}", 1, 1, 'R', 1)
-            
-            pdf.output("cotizacion_final.pdf")
-            with open("cotizacion_final.pdf", "rb") as f:
-                st.download_button("Descargar PDF Listo", f, file_name="Cotizacion.pdf")
+                # --- LOGOS (Sin sobreescribir Header para evitar bugs) ---
+                logo_izq = buscar_logo("logo_classica")
+                if logo_izq:
+                    try: pdf.image(logo_izq, 10, 8, 40)
+                    except: pass
+                    
+                logo_der = buscar_logo("logo_dclass")
+                if logo_der:
+                    try: pdf.image(logo_der, 160, 8, 40)
+                    except: pass
+                
+                pdf.set_y(15)
+                pdf.set_font('Arial', 'B', 16)
+                pdf.cell(0, 10, 'COTIZACION OFICIAL', 0, 1, 'C')
+                
+                # ESPACIO OBLIGATORIO PARA NO PISAR LOS LOGOS
+                pdf.set_y(55) 
+                
+                # --- DATOS CLIENTE ---
+                pdf.set_font('Arial', 'B', 10)
+                pdf.cell(20, 6, 'Cliente:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(90, 6, st.session_state.cliente_actual['nombre'], 0, 0)
+                pdf.set_font('Arial', 'B', 10); pdf.cell(20, 6, 'Fecha:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 6, datetime.now().strftime('%d/%m/%Y'), 0, 1)
+                
+                pdf.set_font('Arial', 'B', 10); pdf.cell(20, 6, 'Telefono:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(90, 6, st.session_state.cliente_actual['telefono'], 0, 0)
+                pdf.set_font('Arial', 'B', 10); pdf.cell(20, 6, 'Asesora:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 6, st.session_state.cliente_actual['asesora'], 0, 1)
+                
+                pdf.set_font('Arial', 'B', 10); pdf.cell(20, 6, 'Direccion:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 6, st.session_state.cliente_actual['direccion'], 0, 1)
+                pdf.ln(8)
+                
+                # --- TABLA ---
+                pdf.set_fill_color(220, 220, 220)
+                pdf.set_font('Arial', 'B', 9)
+                pdf.cell(35, 8, 'AMBIENTE', 1, 0, 'C', 1); pdf.cell(15, 8, 'CANT.', 1, 0, 'C', 1)
+                pdf.cell(110, 8, 'DETALLE', 1, 0, 'C', 1); pdf.cell(30, 8, 'TOTAL', 1, 1, 'C', 1)
+                
+                pdf.set_font('Arial', '', 8)
+                for it in st.session_state.lista_items:
+                    pdf.cell(35, 8, it['ambiente'][:18], 1, 0, 'L'); pdf.cell(15, 8, str(it['cantidad']), 1, 0, 'C')
+                    pdf.cell(110, 8, it['detalle'], 1, 0, 'L'); pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'R')
+                    
+                pdf.ln(5)
+                pdf.set_font('Arial', 'B', 10)
+                pdf.cell(160, 6, 'SUBTOTAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
+                pdf.cell(160, 6, 'IVA (15%):', 0, 0, 'R'); pdf.cell(30, 6, f"${iva:.2f}", 1, 1, 'R')
+                pdf.cell(160, 6, 'TOTAL NORMAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${total_con_iva:.2f}", 1, 1, 'R')
+                
+                pdf.set_fill_color(255, 230, 230); pdf.set_text_color(200, 0, 0)
+                pdf.cell(160, 8, f'TOTAL CONTADO ({descuento_pct}% OFF):', 0, 0, 'R'); pdf.cell(30, 8, f"${total_contado:.2f}", 1, 1, 'R', 1)
+                
+                # --- NOMBRE DE ARCHIVO DINÁMICO ---
+                nombre_limpio = st.session_state.cliente_actual['nombre'].strip().replace(" ", "_")
+                if not nombre_limpio: nombre_limpio = "Cliente"
+                fecha_str = datetime.now().strftime('%Y%m%d_%H%M')
+                nombre_archivo = f"Cotizacion_{nombre_limpio}_{fecha_str}.pdf"
+                
+                pdf.output("cotizacion_final.pdf")
+                with open("cotizacion_final.pdf", "rb") as f:
+                    st.download_button("Descargar PDF", f, file_name=nombre_archivo)
+
     # ==========================================
     #             MÓDULO: HISTÓRICO
     # ==========================================
     elif menu == "📂 Histórico":
         st.title("Historial de Cotizaciones")
         historial = cargar_json(ARCHIVO_HISTORICO)
-        
-        if not historial:
-            st.info("Aún no hay cotizaciones guardadas.")
+        if not historial: st.info("Aún no hay cotizaciones guardadas.")
         else:
             for cot in reversed(historial):
                 with st.expander(f"{cot['cliente']['nombre']} - {cot['codigo']} | {cot['fecha']} - Total: ${cot['contado']:.2f}"):
-                    st.write(f"**Dirección:** {cot['cliente']['direccion']} | **Asesora:** {cot['cliente']['asesora']}")
                     for item in cot['items']:
                         st.write(f"- {item['ambiente']} (x{item['cantidad']}): {item['detalle']} -> ${item['total']:.2f}")
-                    
-                    if st.button("Cargar esta cotización para editar", key=f"btn_{cot['codigo']}"):
+                    if st.button("Cargar esta cotización", key=f"btn_{cot['codigo']}"):
                         st.session_state.cliente_actual = cot['cliente']
                         st.session_state.lista_items = cot['items']
-                        st.success("¡Cotización cargada! Ve a la pestaña 'Cotizar' para verla y editarla.")
+                        st.success("Cargada en la pestaña 'Cotizar'.")
 
     # ==========================================
     #             MÓDULO: CONFIGURAR
     # ==========================================
     elif menu == "⚙️ Configurar":
         st.title("Configuración de la Empresa")
-        st.write("Aquí podrás actualizar los datos maestros en el futuro.")
         config_data = cargar_json(ARCHIVO_CONFIG)
-        
-        telf1 = st.text_input("Teléfonos CLASSICA", value=config_data.get("telf_classica", "(593-2) 2418390"))
-        telf2 = st.text_input("WhatsApp Asesores", value=config_data.get("wa_asesores", "0992445061"))
-        dir_matriz = st.text_input("Dirección Showroom", value=config_data.get("direccion", "Av. 6 de Diciembre N46-274"))
-        
-        if st.button("Guardar Configuración"):
-            nueva_conf = {"telf_classica": telf1, "wa_asesores": telf2, "direccion": dir_matriz}
-            guardar_json(ARCHIVO_CONFIG, nueva_conf)
-            st.success("¡Datos guardados!")
+        telf1 = st.text_input("Teléfonos CLASSICA", value=config_data.get("telf_classica", ""))
+        telf2 = st.text_input("WhatsApp Asesores", value=config_data.get("wa_asesores", ""))
+        dir_matriz = st.text_input("Dirección Showroom", value=config_data.get("direccion", ""))
+        if st.button("Guardar"):
+            guardar_json(ARCHIVO_CONFIG, {"telf_classica": telf1, "wa_asesores": telf2, "direccion": dir_matriz})
+            st.success("Guardado!")
