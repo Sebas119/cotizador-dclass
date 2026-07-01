@@ -215,48 +215,91 @@ else:
         link_wa = f"https://wa.me/?text={urllib.parse.quote(mensaje_wa)}"
         ca2.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; padding:8px; background-color:#25D366; color:white; border:none; border-radius:5px;">📱 Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
 
-        # 3. Generar PDF (Doble Logo)
+        # 3. Generar PDF (Doble Logo y Diseño Profesional)
         class PDFDoble(FPDF):
             def header(self):
-                try:
-                    self.image("logo_classica.jpg", 10, 8, 40)
-                except: pass
-                try:
-                    self.image("logo_dclass.jpg", 160, 8, 40)
-                except: pass
-                self.set_font('Arial', 'B', 15)
+                # Logo Izquierdo (Classica) - Intenta varias extensiones
+                for ext in ["logo_classica.jpg", "logo_classica.jpeg", "logo_classica.png"]:
+                    try:
+                        self.image(ext, 10, 8, 40)
+                        break
+                    except: pass
+                
+                # Logo Derecho (D/CLASS) - Intenta varias extensiones
+                for ext in ["logo_dclass.png", "logo_dclass.jpg", "logo_dclass.jpeg"]:
+                    try:
+                        self.image(ext, 160, 8, 40)
+                        break
+                    except: pass
+                
+                self.set_y(15)
+                self.set_font('Arial', 'B', 16)
                 self.cell(0, 10, 'COTIZACION OFICIAL', 0, 1, 'C')
-                self.ln(10)
+                
+                # Salto de línea vital para que los logos no tapen el texto
+                self.set_y(45) 
                 
         if ca3.button("📄 Generar PDF"):
             pdf = PDFDoble()
             pdf.add_page()
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(0, 6, f"Cliente: {st.session_state.cliente_actual['nombre']} | Tel: {st.session_state.cliente_actual['telefono']}", 0, 1)
-            pdf.cell(0, 6, f"Direccion: {st.session_state.cliente_actual['direccion']} | Asesora: {st.session_state.cliente_actual['asesora']}", 0, 1)
-            pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y')}", 0, 1)
-            pdf.ln(5)
             
+            # --- Encabezado de Datos ---
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(20, 6, 'Cliente:', 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(90, 6, st.session_state.cliente_actual['nombre'], 0, 0)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(20, 6, 'Fecha:', 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(0, 6, datetime.now().strftime('%d/%m/%Y'), 0, 1)
+            
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(20, 6, 'Telefono:', 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(90, 6, st.session_state.cliente_actual['telefono'], 0, 0)
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(20, 6, 'Asesora:', 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(0, 6, st.session_state.cliente_actual['asesora'], 0, 1)
+            
+            pdf.set_font('Arial', 'B', 10)
+            pdf.cell(20, 6, 'Direccion:', 0, 0)
+            pdf.set_font('Arial', '', 10)
+            pdf.cell(0, 6, st.session_state.cliente_actual['direccion'], 0, 1)
+            
+            pdf.ln(8)
+            
+            # --- Tabla de Productos ---
+            pdf.set_fill_color(220, 220, 220)
             pdf.set_font('Arial', 'B', 9)
-            pdf.cell(30, 8, 'AMBIENTE', 1); pdf.cell(15, 8, 'CANT.', 1); pdf.cell(115, 8, 'DETALLE', 1); pdf.cell(30, 8, 'TOTAL', 1, 1)
+            pdf.cell(35, 8, 'AMBIENTE', 1, 0, 'C', 1)
+            pdf.cell(15, 8, 'CANT.', 1, 0, 'C', 1)
+            pdf.cell(110, 8, 'DETALLE', 1, 0, 'C', 1)
+            pdf.cell(30, 8, 'TOTAL', 1, 1, 'C', 1)
             
             pdf.set_font('Arial', '', 8)
             for it in st.session_state.lista_items:
-                pdf.cell(30, 8, it['ambiente'][:15], 1); pdf.cell(15, 8, str(it['cantidad']), 1, 0, 'C')
-                pdf.cell(115, 8, it['detalle'], 1); pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'C')
+                pdf.cell(35, 8, it['ambiente'][:18], 1, 0, 'L')
+                pdf.cell(15, 8, str(it['cantidad']), 1, 0, 'C')
+                pdf.cell(110, 8, it['detalle'], 1, 0, 'L')
+                pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'R')
                 
             pdf.ln(5)
+            
+            # --- Totales ---
             pdf.set_font('Arial', 'B', 10)
-            pdf.cell(160, 6, 'SUBTOTAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 0, 1, 'R')
-            pdf.cell(160, 6, 'IVA (15%):', 0, 0, 'R'); pdf.cell(30, 6, f"${iva:.2f}", 0, 1, 'R')
-            pdf.cell(160, 6, 'TOTAL NORMAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${total_con_iva:.2f}", 0, 1, 'R')
-            pdf.set_text_color(255, 0, 0)
-            pdf.cell(160, 6, f'TOTAL CONTADO ({descuento_pct}% OFF):', 0, 0, 'R'); pdf.cell(30, 6, f"${total_contado:.2f}", 0, 1, 'R')
+            pdf.cell(160, 6, 'SUBTOTAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
+            pdf.cell(160, 6, 'IVA (15%):', 0, 0, 'R'); pdf.cell(30, 6, f"${iva:.2f}", 1, 1, 'R')
+            pdf.cell(160, 6, 'TOTAL NORMAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${total_con_iva:.2f}", 1, 1, 'R')
+            
+            pdf.set_fill_color(255, 230, 230)
+            pdf.set_text_color(200, 0, 0)
+            pdf.cell(160, 8, f'TOTAL CONTADO ({descuento_pct}% OFF):', 0, 0, 'R')
+            pdf.cell(30, 8, f"${total_contado:.2f}", 1, 1, 'R', 1)
             
             pdf.output("cotizacion_final.pdf")
             with open("cotizacion_final.pdf", "rb") as f:
                 st.download_button("Descargar PDF Listo", f, file_name="Cotizacion.pdf")
-
     # ==========================================
     #             MÓDULO: HISTÓRICO
     # ==========================================
