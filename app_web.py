@@ -6,6 +6,7 @@ import glob
 from fpdf import FPDF
 from datetime import datetime
 import urllib.parse
+from PIL import Image
 
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="Cotizador D/CLASS & CLASSICA", layout="wide")
@@ -28,14 +29,12 @@ def guardar_json(archivo, datos):
         json.dump(datos, f, indent=4)
 
 def buscar_logo(prefijo):
-    # Busca cualquier archivo que empiece con el prefijo, sin importar la extensión
     archivos = glob.glob(f"{prefijo}.*")
     for arch in archivos:
         if arch.lower().endswith(('.png', '.jpg', '.jpeg')):
             return arch
     return None
 
-# Inicializar estados
 if 'acceso_concedido' not in st.session_state: st.session_state.acceso_concedido = False
 if 'lista_items' not in st.session_state: st.session_state.lista_items = []
 if 'cliente_actual' not in st.session_state: st.session_state.cliente_actual = {"nombre": "", "telefono": "", "direccion": "", "asesora": "Celmira Zapata"}
@@ -51,7 +50,7 @@ if not st.session_state.acceso_concedido:
         else:
             st.error("Acceso denegado.")
 else:
-    # --- 4. CARGAR EXCEL (CON ARMADURA) ---
+    # --- 4. CARGAR EXCEL ---
     @st.cache_data
     def cargar_excel():
         try:
@@ -220,16 +219,22 @@ else:
                 pdf = FPDF()
                 pdf.add_page()
                 
-                # --- LOGOS (Sin sobreescribir Header para evitar bugs) ---
-                logo_izq = buscar_logo("logo_classica")
-                if logo_izq:
-                    try: pdf.image(logo_izq, 10, 8, 40)
-                    except: pass
-                    
-                logo_der = buscar_logo("logo_dclass")
-                if logo_der:
-                    try: pdf.image(logo_der, 160, 8, 40)
-                    except: pass
+                # Función Purificadora de Logos
+                def estampar_logo_seguro(prefijo, x, y, w):
+                    ruta = buscar_logo(prefijo)
+                    if ruta:
+                        try:
+                            img = Image.open(ruta)
+                            if img.mode != 'RGB':
+                                img = img.convert('RGB')
+                            temp_img = f"temp_{prefijo}.jpg"
+                            img.save(temp_img, "JPEG")
+                            pdf.image(temp_img, x, y, w)
+                        except Exception as e:
+                            pass
+
+                estampar_logo_seguro("logo_classica", 10, 8, 40)
+                estampar_logo_seguro("logo_dclass", 160, 8, 40)
                 
                 pdf.set_y(15)
                 pdf.set_font('Arial', 'B', 16)
