@@ -46,12 +46,22 @@ else:
     # --- 4. CARGAR DATOS DE EXCEL ---
     @st.cache_data
     def cargar_excel():
-        df_mod = pd.read_csv("datos_cortinas.csv", encoding="latin-1")
+        # Leer modernas con armadura
+        try:
+            df_mod = pd.read_csv("datos_cortinas.csv", encoding="utf-8")
+        except:
+            df_mod = pd.read_csv("datos_cortinas.csv", encoding="latin-1")
+            
         df_mod['m2'] = pd.to_numeric(df_mod['m2'].astype(str).str.replace('$', '', regex=False).str.replace(',', '.').str.strip())
         df_mod['tipo de cortina'] = df_mod['tipo de cortina'].astype(str).str.title().str.strip()
         df_mod['tipo de tela'] = df_mod['tipo de tela'].fillna('Única').astype(str).str.title().str.strip()
 
-        df_trad = pd.read_csv("datos_tradicionales.csv", encoding="latin-1")
+        # Leer tradicionales con armadura
+        try:
+            df_trad = pd.read_csv("datos_tradicionales.csv", encoding="utf-8")
+        except:
+            df_trad = pd.read_csv("datos_tradicionales.csv", encoding="latin-1")
+            
         df_trad['Precio'] = pd.to_numeric(df_trad['Precio'].astype(str).str.replace('$', '', regex=False).str.replace(',', '.').str.strip())
         
         return df_mod, df_trad
