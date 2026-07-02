@@ -203,11 +203,12 @@ else:
             else:
                 st.error("Faltan datos del cliente o productos.")
 
-        # WhatsApp
-        mensaje_wa = f"*COTIZACIÓN D/CLASS & CLASSICA*\nCliente: {st.session_state.cliente_actual['nombre']}\n\n*Resumen:*\n"
+        # WhatsApp (Compacto y estructurado)
+        mensaje_wa = f"*COTIZACIÓN*\nCliente: {st.session_state.cliente_actual['nombre']}\n*Resumen:*\n"
         for it in st.session_state.lista_items:
-            mensaje_wa += f"- {it['ambiente']} (x{it['cantidad']}): {it['detalle']} -> ${it['total']:.2f}\n"
-        mensaje_wa += f"\n*TOTAL CONTADO:* ${total_contado:.2f}\n_Entrega en {dias_entrega}_"
+            mensaje_wa += f"• {it['ambiente']} (x{it['cantidad']}): {it['detalle']} -> ${it['total']:.2f}\n"
+        mensaje_wa += f"*SUBTOTAL:* ${subtotal:.2f}\n*IVA (15%):* ${iva:.2f}\n*TOTAL CONTADO:* ${total_contado:.2f}\n_Entrega: {dias_entrega}_"
+        
         link_wa = f"https://wa.me/?text={urllib.parse.quote(mensaje_wa)}"
         ca2.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; padding:8px; background-color:#25D366; color:white; border:none; border-radius:5px;">📱 Enviar por WhatsApp</button></a>', unsafe_allow_html=True)
 
@@ -254,20 +255,28 @@ else:
                 pdf.set_font('Arial', 'B', 10); pdf.cell(20, 6, 'Direccion:', 0, 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 6, st.session_state.cliente_actual['direccion'], 0, 1)
                 pdf.ln(8)
                 
-                # --- TABLA ---
+                # --- TABLA ACTUALIZADA CON PRECIO UNITARIO ---
                 pdf.set_fill_color(220, 220, 220)
-                pdf.set_font('Arial', 'B', 9)
-                pdf.cell(35, 8, 'AMBIENTE', 1, 0, 'C', 1); pdf.cell(15, 8, 'CANT.', 1, 0, 'C', 1)
-                pdf.cell(110, 8, 'DETALLE', 1, 0, 'C', 1); pdf.cell(30, 8, 'TOTAL', 1, 1, 'C', 1)
+                pdf.set_font('Arial', 'B', 8)
+                pdf.cell(30, 8, 'AMBIENTE', 1, 0, 'C', 1)
+                pdf.cell(12, 8, 'CANT.', 1, 0, 'C', 1)
+                pdf.cell(98, 8, 'DETALLE', 1, 0, 'C', 1)
+                pdf.cell(20, 8, 'P. UNIT', 1, 0, 'C', 1)
+                pdf.cell(30, 8, 'TOTAL', 1, 1, 'C', 1)
                 
-                pdf.set_font('Arial', '', 8)
+                pdf.set_font('Arial', '', 7)
                 for it in st.session_state.lista_items:
-                    pdf.cell(35, 8, it['ambiente'][:18], 1, 0, 'L'); pdf.cell(15, 8, str(it['cantidad']), 1, 0, 'C')
-                    pdf.cell(110, 8, it['detalle'], 1, 0, 'L'); pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'R')
+                    pdf.cell(30, 8, it['ambiente'][:15], 1, 0, 'L')
+                    pdf.cell(12, 8, str(it['cantidad']), 1, 0, 'C')
+                    pdf.cell(98, 8, it['detalle'], 1, 0, 'L')
+                    pdf.cell(20, 8, f"${it['precio_u']:.2f}", 1, 0, 'C')
+                    pdf.cell(30, 8, f"${it['total']:.2f}", 1, 1, 'R')
                     
                 pdf.ln(5)
+                
+                # --- TOTALES ACTUALIZADOS ---
                 pdf.set_font('Arial', 'B', 10)
-                pdf.cell(160, 6, 'SUBTOTAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
+                pdf.cell(160, 6, 'SUBTOTAL (SIN IVA):', 0, 0, 'R'); pdf.cell(30, 6, f"${subtotal:.2f}", 1, 1, 'R')
                 pdf.cell(160, 6, 'IVA (15%):', 0, 0, 'R'); pdf.cell(30, 6, f"${iva:.2f}", 1, 1, 'R')
                 pdf.cell(160, 6, 'TOTAL NORMAL:', 0, 0, 'R'); pdf.cell(30, 6, f"${total_con_iva:.2f}", 1, 1, 'R')
                 
